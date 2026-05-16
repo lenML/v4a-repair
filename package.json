@@ -1,7 +1,7 @@
 {
   "name": "@lenml/v4a-repair",
   "version": "1.0.0",
-  "description": "",
+  "description": "v4a grammar repair",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,11 +22,21 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsup"
+    "build": "tsup",
+    "prepublish": "pnpm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "v4a",
+    "codex",
+    "repair",
+    "autofix",
+    "repair",
+    "code-agent",
+    "coding-agent",
+    "agent"
+  ],
+  "author": "lenml",
+  "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
     "@types/node": "^25.8.0",
