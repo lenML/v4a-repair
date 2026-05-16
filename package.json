@@ -35,7 +35,19 @@
     "coding-agent",
     "agent"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lenML/v4a-repair.git"
+  },
   "author": "lenml",
+  "bugs": {
+    "url": "https://github.com/lenML/v4a-repair/issues"
+  },
+  "homepage": "https://github.com/lenML/v4a-repair#readme",
   "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
