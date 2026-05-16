@@ -1,4 +1,4 @@
-import { PatchAutoFixer } from "@lenml/v4a-repair";
+import { PatchAutoFixer } from "../dist/main.mjs";
 import { readFileSync } from "fs";
 
 function main() {

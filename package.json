@@ -1,6 +1,6 @@
 {
   "name": "@lenml/v4a-repair",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "v4a grammar repair",
   "main": "dist/main.js",
   "module": "dist/main.mjs",
@@ -17,8 +17,13 @@
       }
     }
   },
+  "bin": {
+    "v4a-repair": "./bin/cli.mjs"
+  },
   "files": [
-    "dist"
+    "dist",
+    "scripts/codex.mjs",
+    "bin"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
