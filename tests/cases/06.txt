@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: docs/config.md
+@@
+| key | type | default | description |
+@@
+| timeout | int | 30 | timeout in seconds |
+*** End Patch

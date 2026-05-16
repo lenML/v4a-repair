@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: playground/main.ts
+@@ 
+ import { auto_pan_plugin } from "@/plugins/auto_pan";
+ import { executor_plugin } from "@/plugins/executor_plugin";
++import { node_picker_plugin } from "@/plugins/node_picker";
+ import { DefaultNode } from "@/index";
+@@ 
+   const easel = new Easel(canvas_el, {
+     plugins: [
+       context_menu_plugin,
++      node_picker_plugin,
+       minimap_plugin,
+       controls_plugin,
+       history_plugin,
+*** End Patch

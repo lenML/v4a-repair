@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Move to: src/newfile.js
+ function test() {
+     console.log("moved");
+ }
+*** End Patch

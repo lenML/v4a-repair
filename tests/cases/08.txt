@@ -1,0 +1,267 @@
+*** Add File: O:\work_space\github.com\@lenML\oai-tts-router\src\providers\grok-console-tts.ts
++/**
++ * Grok Console TTS provider.
++ * Uses cuimp to impersonate Chrome 146 TLS fingerprint and calls
++ * the x.ai Console Playground TTS endpoint for speech synthesis.
++ *
++ * Supports 5 voices: eve, ara, rex, sal, leo
++ * Supports codecs: mp3, pcm, ulaw, opus
++ *
++ * Configuration (config.json):
++ *   `providers.grok-console-tts.cookies` - array of cookie strings
++ *     Each cookie should include sso, sso-rw, __cf_bm values.
++ *     Multiple cookies are rotated randomly with fallback on retry.
++ *
++ * Supported extra params:
++ *   - voice (optional, default "eve"): eve, ara, rex, sal, leo
++ *   - codec (optional, default "mp3"): mp3, pcm, ulaw, opus
++ *   - language (optional, default "en"): language code
++ *   - sample_rate (optional, default 24000): sample rate in Hz
++ */
++
++import { z } from 'zod';
++import { createCuimpHttp } from 'cuimp';
++import { OpenAiError } from '../errors.js';
++import { OPENAI_ERROR_TYPE, OPENAI_ERROR_CODE } from '../types/openai.js';
++import { tts_request_base } from '../types/schema.js';
++import type { TtsProvider, SpeechParams, SpeechResult } from '../types/provider.js';
++
++// ── Schema ───────────────────────────────────────────────────
++
++const grok_tts_schema = tts_request_base.extend({
++  voice: z.string().optional(),
++  codec: z.enum(['mp3', 'pcm', 'ulaw', 'opus']).optional(),
++  language: z.string().optional(),
++  sample_rate: z.number().int().positive().optional(),
++});
++
++// ── Constants ────────────────────────────────────────────────
++
++const CONSOLE_BASE = 'https://console.x.ai';
++const TTS_ENDPOINT = `${CONSOLE_BASE}/v1/tts`;
++
++const GROK_VOICES = ['eve', 'ara', 'rex', 'sal', 'leo'] as const;
++
++const GROK_MIME: Record<string, string> = {
++  mp3: 'audio/mpeg',
++  pcm: 'audio/L16; rate=24000; channels=1',
++  ulaw: 'audio/basic',
++  opus: 'audio/ogg; codecs=opus',
++};
++
++const BASE_HEADERS: Record<string, string> = {
++  accept: '*/*',
++  'accept-language': 'zh-CN,zh;q=0.9',
++  'content-type': 'application/json',
++  dnt: '1',
++  origin: CONSOLE_BASE,
++  priority: 'u=1, i',
++  referer: `${CONSOLE_BASE}/playground/voice/text-to-speech?campaign=stt-tts-blog`,
++  'sec-fetch-dest': 'empty',
++  'sec-fetch-mode': 'cors',
++  'sec-fetch-site': 'same-origin',
++  'x-cluster': 'https://us-east-1.api.x.ai',
++};
++
++// ── Provider ─────────────────────────────────────────────────
++
++export class GrokTtsProvider implements TtsProvider {
++  readonly name = 'grok-console-tts';
++  readonly owned_by = 'x-ai';
++  request_schema = grok_tts_schema;
++
++  private cookies: string[];
++
++  constructor(config?: Record<string, unknown>) {
++    const raw = config?.cookies;
++    if (Array.isArray(raw)) {
++      this.cookies = raw.filter((c): c is string => typeof c === 'string' && c.length > 0);
++    } else if (typeof raw === 'string') {
++      this.cookies = [raw];
++    } else {
++      this.cookies = [];
++    }
++  }
++
++  get_models(): string[] {
++    return ['grok-console-tts'];
++  }
++
++  get_model_voices(_model: string): string[] {
++    return [...GROK_VOICES];
++  }
++
++  supports_model(model: string): boolean {
++    return model === 'grok-console-tts';
++  }
++
++  async speak(params: SpeechParams): Promise<SpeechResult> {
++    // ── Validate voice ──────────────────────────────────────
++    const voice = (params.extra['voice'] as string | undefined) ?? 'eve';
++    if (!GROK_VOICES.includes(voice as (typeof GROK_VOICES)[number])) {
++      throw new OpenAiError(
++        `Unsupported voice '${voice}'. Supported: ${GROK_VOICES.join(', ')}`,
++        OPENAI_ERROR_TYPE.INVALID_REQUEST,
++        'voice',
++        OPENAI_ERROR_CODE.VOICE_NOT_SUPPORTED,
++        400,
++      );
++    }
++
++    // ── Parse extra params ──────────────────────────────────
++    const codec = (params.extra['codec'] as string | undefined) ?? 'mp3';
++    const language = (params.extra['language'] as string | undefined) ?? 'en';
++    const sample_rate = (params.extra['sample_rate'] as number | undefined) ?? 24000;
++
++    // ── Build request body ──────────────────────────────────
++    const body: Record<string, unknown> = {
++      text: params.input,
++      voice_id: voice,
++      language,
++      text_normalization: true,
++    };
++
++    // Only include output_format when not using default codec/sample_rate
++    if (codec !== 'mp3' || sample_rate !== 24000) {
++      body['output_format'] = { codec, sample_rate };
++    }
++
++    const body_str = JSON.stringify(body);
++    const content_length = String(Buffer.byteLength(body_str, 'utf-8'));
++
++    // ── Pick a random cookie ────────────────────────────────
++    let current_cookie: string | null = pick_random(this.cookies) ?? null;
++
++    if (!current_cookie) {
++      throw new OpenAiError(
++        'No cookies configured for grok-console-tts. '
++          + 'Add `providers.grok-console-tts.cookies` to config.json.',
++        OPENAI_ERROR_TYPE.PROVIDER,
++        null,
++        OPENAI_ERROR_CODE.PROVIDER_UNAVAILABLE,
++        502,
++      );
++    }
++
++    // ── Retry loop ──────────────────────────────────────────
++    const max_retries = 3;
++
++    for (let attempt = 0; attempt <= max_retries; attempt++) {
++      if (attempt > 0) {
++        // Exponential backoff: 2^attempt seconds (with jitter)
++        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
++        await sleep(delay);
++
++        // On retry, pick a different cookie if available
++        if (this.cookies.length > 1) {
++          const available = this.cookies.filter(c => c !== current_cookie);
++          current_cookie = pick_random(available) ?? current_cookie;
++        }
++      }
++
++      const headers: Record<string, string> = {
++        ...BASE_HEADERS,
++        cookie: current_cookie,
++        'content-length': content_length,
++      };
++
++      try {
++        const client = createCuimpHttp({
++          descriptor: { browser: 'chrome', version: '146' },
++        });
++
++        const response = await client.request({
++          url: TTS_ENDPOINT,
++          method: 'POST',
++          headers,
++          data: body_str,
++          timeout: 30000,
++        });
++
++        const status = response.status;
++        const response_ct = (response.headers['content-type'] as string | undefined) ?? '';
++
++        if (status === 200 && !response_ct.includes('text/html')) {
++          const effective_codec = sniff_codec(response_ct, codec);
++          const mime = effective_codec === 'pcm'
++            ? `audio/L16; rate=${sample_rate}; channels=1`
++            : GROK_MIME[effective_codec] ?? 'audio/mpeg';
++
++          return {
++            content_type: mime,
++            data: Buffer.from(response.rawBody),
++          };
++        }
++
++        // Retry on rate-limit or server errors
++        if (status === 429 || status === 500 || status === 503) {
++          if (attempt === max_retries) {
++            throw new OpenAiError(
++              `grok-console-tts returned ${status} after ${max_retries} retries`,
++              OPENAI_ERROR_TYPE.PROVIDER,
++              null,
++              OPENAI_ERROR_CODE.PROVIDER_UNAVAILABLE,
++              502,
++            );
++          }
++          continue;
++        }
++
++        // Non-retryable error
++        const preview = response.rawBody
++          ? Buffer.from(response.rawBody).toString('utf-8').slice(0, 300)
++          : '';
++        throw new OpenAiError(
++          `grok-console-tts returned HTTP ${status}: ${preview}`,
++          OPENAI_ERROR_TYPE.PROVIDER,
++          null,
++          OPENAI_ERROR_CODE.PROVIDER_UNAVAILABLE,
++          502,
++        );
++      } catch (err) {
++        if (err instanceof OpenAiError) {
++          throw err;
++        }
++
++        const message = err instanceof Error ? err.message : String(err);
++        if (attempt === max_retries) {
++          throw new OpenAiError(
++            `grok-console-tts request failed: ${message}`,
++            OPENAI_ERROR_TYPE.PROVIDER,
++            null,
++            OPENAI_ERROR_CODE.PROVIDER_UNAVAILABLE,
++            502,
++          );
++        }
++        // Otherwise retry after delay
++        continue;
++      }
++    }
++
++    throw new OpenAiError(
++      'Unexpected end of retry loop in grok-console-tts provider',
++      OPENAI_ERROR_TYPE.PROVIDER,
++      null,
++      OPENAI_ERROR_CODE.PROVIDER_UNAVAILABLE,
++      500,
++    );
++  }
++}
++
++// ── Helpers ───────────────────────────────────────────────────
++
++function pick_random<T>(items: T[]): T | undefined {
++  if (items.length === 0) return undefined;
++  return items[Math.floor(Math.random() * items.length)];
++}
++
++function sniff_codec(response_ct: string, fallback: string): string {
++  if (response_ct.includes('mpeg')) return 'mp3';
++  if (response_ct.includes('pcm') || response_ct.includes('L16')) return 'pcm';
++  if (response_ct.includes('ulaw') || response_ct.includes('basic')) return 'ulaw';
++  if (response_ct.includes('opus')) return 'opus';
++  return fallback;
++}
++
++const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+*** End Patch
