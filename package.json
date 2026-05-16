@@ -1,6 +1,6 @@
 {
   "name": "@lenml/v4a-repair",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "v4a grammar repair",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

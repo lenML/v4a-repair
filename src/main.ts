@@ -12,6 +12,7 @@ export interface Fix {
 export interface ParseResult {
   success: boolean;
   result?: any;
+  fixedText?: string;
   fixes: Fix[];
   error?: any;
 }
@@ -30,7 +31,7 @@ export class PatchAutoFixer {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = this.parser.parse(currentText);
-        return { success: true, result, fixes };
+        return { success: true, result, fixedText: currentText, fixes };
       } catch (error) {
         if (attempt < maxRetries && this.isFixableError(error)) {
           const fixResult = this.attemptFix(currentText, error as any);
