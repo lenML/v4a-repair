@@ -1,1 +1,1 @@
-lark-js ./scripts/v4a.lark | sed 's/.*const util.*//' | sed 's/.*\"strict\": false.*//' | sed 's/.*\"ordered_sets\": true.*//' > ./src/v4a_parser.js
+lark-js ./scripts/v4a.lark | sed 's/.*const util.*/const util = null;/' | sed 's/.*\"strict\": false.*//' | sed 's/.*\"ordered_sets\": true.*//' | sed 's/.*"cache_grammar": false.*//' > ./src/v4a_parser.js
