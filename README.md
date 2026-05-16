@@ -194,12 +194,14 @@ interface Fix {
 在 `.codex/hooks.json` 中：
 
 ```json
-{
-  "event": "PreToolUse",
-  "tool": "apply_patch",
-  "command": "npx @lenml/v4a-repair codex",
-  "timeout": 10000
-}
+[
+  {
+    "event": "PreToolUse",
+    "tool": "apply_patch",
+    "command": "npx @lenml/v4a-repair codex",
+    "timeout": 10000
+  }
+]
 ```
 
 ## 许可证
