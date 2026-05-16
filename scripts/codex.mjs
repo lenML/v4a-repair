@@ -8,15 +8,16 @@ function main() {
   try {
     hookData = JSON.parse(rawInput);
   } catch {
-    // 解析失败 -> 阻止执行 (退出码2)，且无任何输出
-    process.exit(2);
+    // 解析失败 -> 阻止执行 (退出码0)，静默失败
+    console.log(rawInput);
+    process.exit(0);
   }
 
   // 2. 提取需要修复的补丁文本
-  const originalPatch = hookData.tool_input || "";
+  const originalPatch = hookData?.tool_input?.command || "";
   if (!originalPatch) {
     // 无输入，直接放行
-    console.log(JSON.stringify(hookData));
+    console.log(rawInput);
     process.exit(0);
   }
 

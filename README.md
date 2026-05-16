@@ -189,21 +189,6 @@ interface Fix {
 | `remove_trailing_space_after_atat` | 移除 `@@ ` 后面的多余空格                                |
 | `close_change_block_before_end`    | 在 `*** End Patch` 前插入 `@@` 关闭未闭合的 change block |
 
-## Codex
-
-在 `.codex/hooks.json` 中：
-
-```json
-[
-  {
-    "event": "PreToolUse",
-    "tool": "apply_patch",
-    "command": "npx @lenml/v4a-repair codex",
-    "timeout": 10000
-  }
-]
-```
-
 ## 许可证
 
 MIT © [lenML](https://github.com/lenML)
